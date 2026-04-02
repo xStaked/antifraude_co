@@ -1,0 +1,21 @@
+{
+  "name": "@sn8/database",
+  "version": "0.0.1",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "db:push": "prisma db push"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.5.0"
+  },
+  "devDependencies": {
+    "@sn8/typescript-config": "workspace:*",
+    "prisma": "^6.5.0",
+    "typescript": "^5.8.2"
+  }
+}

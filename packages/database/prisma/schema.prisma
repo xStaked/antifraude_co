@@ -1,0 +1,163 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model ReportTarget {
+  id                     String   @id @default(uuid()) @db.Uuid
+  normalizedPhone        String   @unique @db.VarChar(15)
+  displayPhoneMasked     String   @db.VarChar(15)
+  riskScoreSnapshot      Int      @default(0)
+  riskLevelSnapshot      RiskLevel @default(none)
+  totalApprovedReports   Int      @default(0)
+  lastReportAt           DateTime? @db.Timestamptz(6)
+  createdAt              DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt              DateTime @updatedAt @db.Timestamptz(6)
+
+  reports        Report[]
+  reviewRequests ReviewRequest[]
+
+  @@index([riskLevelSnapshot])
+  @@index([lastReportAt])
+  @@map("report_targets")
+}
+
+model Report {
+  id                String     @id @default(uuid()) @db.Uuid
+  targetId          String     @db.Uuid
+  reporterIpHash    String     @db.VarChar(64)
+  reporterName      String?    @db.VarChar(100)
+  reportedName      String?    @db.VarChar(100)
+  amountCents       BigInt?
+  incidentDate      DateTime   @db.Date
+  fraudType         FraudType
+  channel           Channel
+  description       String     @db.Text
+  status            ReportStatus @default(pending)
+  dedupHash         String     @db.VarChar(64)
+  createdAt         DateTime   @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime   @updatedAt @db.Timestamptz(6)
+
+  target     ReportTarget        @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  evidence   ReportEvidence[]
+  actions    ModerationAction[]
+
+  @@index([targetId, status])
+  @@index([dedupHash])
+  @@index([createdAt])
+  @@map("reports")
+}
+
+model ReportEvidence {
+  id         String   @id @default(uuid()) @db.Uuid
+  reportId   String   @db.Uuid
+  fileUrl    String   @db.Text
+  fileType   String   @db.VarChar(50)
+  fileSize   Int
+  checksum   String   @db.VarChar(64)
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@map("report_evidence")
+}
+
+model ModerationAction {
+  id           String      @id @default(uuid()) @db.Uuid
+  reportId     String      @db.Uuid
+  adminUserId  String      @db.Uuid
+  actionType   ActionType
+  note         String      @db.Text
+  createdAt    DateTime    @default(now()) @db.Timestamptz(6)
+
+  report    Report    @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  adminUser AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Restrict)
+
+  @@index([reportId])
+  @@index([adminUserId])
+  @@map("moderation_actions")
+}
+
+model ReviewRequest {
+  id               String            @id @default(uuid()) @db.Uuid
+  targetId         String            @db.Uuid
+  applicantName    String            @db.VarChar(100)
+  contactEmail     String            @db.VarChar(255)
+  reason           String            @db.Text
+  status           ReviewStatus      @default(open)
+  resolutionNote   String?           @db.Text
+  createdAt        DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime          @updatedAt @db.Timestamptz(6)
+
+  target ReportTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@index([targetId])
+  @@index([status])
+  @@map("review_requests")
+}
+
+model AdminUser {
+  id            String   @id @default(uuid()) @db.Uuid
+  email         String   @unique @db.VarChar(255)
+  passwordHash  String   @db.VarChar(255)
+  role          AdminRole @default(moderator)
+  lastLoginAt   DateTime? @db.Timestamptz(6)
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+
+  actions ModerationAction[]
+
+  @@map("admin_users")
+}
+
+enum RiskLevel {
+  none
+  low
+  medium
+  high
+}
+
+enum FraudType {
+  fake_voucher
+  not_reflected
+  attempt
+}
+
+enum Channel {
+  whatsapp
+  facebook_marketplace
+  instagram
+  other
+}
+
+enum ReportStatus {
+  pending
+  approved
+  rejected
+  hidden
+  flagged
+}
+
+enum ActionType {
+  approve
+  reject
+  hide
+  flag_duplicate
+}
+
+enum ReviewStatus {
+  open
+  in_review
+  resolved
+  rejected
+}
+
+enum AdminRole {
+  moderator
+  admin
+}

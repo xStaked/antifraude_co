@@ -1,0 +1,12 @@
+{
+  "extends": "@sn8/typescript-config/nestjs.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "noEmit": false,
+    "paths": {
+      "@prisma/client": ["../../node_modules/.prisma/client"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

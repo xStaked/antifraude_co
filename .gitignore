@@ -1,0 +1,49 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Local env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Turbo
+.turbo
+
+# Build outputs
+dist
+build
+*.tsbuildinfo
+
+# Next.js
+.next
+out
+
+# NestJS
+coverage
+
+# IDEs
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Database
+*.db
+*.sqlite
+
+# Docker
+docker-data
