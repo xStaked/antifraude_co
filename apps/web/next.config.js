@@ -1,8 +1,11 @@
+const path = require('path');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ['@sn8/database'],
-  outputFileTracingRoot: __dirname,
+  output: 'standalone',
+  outputFileTracingRoot: path.join(__dirname, '../..'),
   distDir: '.next',
 };
 
