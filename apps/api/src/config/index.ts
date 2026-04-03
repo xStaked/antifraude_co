@@ -1,9 +1,11 @@
 export const appConfig = () => ({
   port: parseInt(process.env.PORT ?? '3001', 10),
+  appTimezone: process.env.APP_TIMEZONE ?? 'America/Bogota',
   databaseUrl: process.env.DATABASE_URL,
   redisUrl: process.env.REDIS_URL,
   jwtSecret: process.env.JWT_SECRET,
   publicWebUrl: process.env.PUBLIC_WEB_URL,
+  googleApiKey: process.env.GOOGLE_API_KEY,
   s3: {
     endpoint: process.env.S3_ENDPOINT,
     region: process.env.S3_REGION ?? 'us-east-1',

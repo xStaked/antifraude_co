@@ -11,20 +11,26 @@ export class S3Service {
   private readonly publicUrl: string;
 
   constructor(private readonly config: ConfigService) {
-    const endpoint = this.config.get<string>('s3.endpoint');
-    const region = this.config.get<string>('s3.region');
-    const accessKeyId = this.config.get<string>('s3.accessKeyId');
-    const secretAccessKey = this.config.get<string>('s3.secretAccessKey');
-    this.bucketName = this.config.get<string>('s3.bucketName') ?? 'antifraude-evidence';
-    this.publicUrl = this.config.get<string>('s3.publicUrl') ?? endpoint ?? '';
+    const endpoint = this.config.get<string>('s3.endpoint') ?? process.env.S3_ENDPOINT;
+    const region = this.config.get<string>('s3.region') ?? process.env.S3_REGION;
+    const accessKeyId = this.config.get<string>('s3.accessKeyId') ?? process.env.S3_ACCESS_KEY_ID;
+    const secretAccessKey = this.config.get<string>('s3.secretAccessKey') ?? process.env.S3_SECRET_ACCESS_KEY;
+    this.bucketName = this.config.get<string>('s3.bucketName') ?? process.env.S3_BUCKET_NAME ?? 'antifraude-evidence';
+    this.publicUrl = this.config.get<string>('s3.publicUrl') ?? process.env.S3_PUBLIC_URL ?? endpoint ?? '';
+    
 
+
+    // Detect if using R2 (Cloudflare) vs MinIO/S3
+    const isR2 = endpoint?.includes('r2.cloudflarestorage.com');
+    
     this.client = new S3Client({
-      region,
+      region: region || 'auto',
       endpoint,
       credentials: accessKeyId && secretAccessKey
         ? { accessKeyId, secretAccessKey }
         : undefined,
-      forcePathStyle: true,
+      // R2 uses virtual-hosted style, MinIO uses path-style
+      forcePathStyle: !isR2,
     });
   }
 
@@ -47,5 +53,21 @@ export class S3Service {
     const publicUrl = `${this.publicUrl}/${key}`;
 
     return { uploadUrl, publicUrl, key };
+  }
+
+  async uploadBuffer(key: string, buffer: Buffer, mimeType: string): Promise<void> {
+    const command = new PutObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+      Body: buffer,
+      ContentType: mimeType,
+      ContentLength: buffer.length,
+    });
+
+    await this.client.send(command);
+  }
+
+  getPublicUrl(key: string): string {
+    return `${this.publicUrl}/${key}`;
   }
 }

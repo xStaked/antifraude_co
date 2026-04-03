@@ -1,6 +1,34 @@
-const { prisma, ReportStatus, FraudType, Channel, RiskLevel } = require('./dist');
+const { prisma, ReportStatus, FraudType, Channel, RiskLevel, AdminRole } = require('./dist');
 
 async function main() {
+  // Crear usuarios admin de prueba
+  const adminUsers = [
+    {
+      email: 'admin@sn8.com',
+      passwordHash: '$2b$10$YourHashedPasswordHere', // placeholder - en producción usar bcrypt
+      role: AdminRole.admin,
+    },
+    {
+      email: 'moderator@sn8.com',
+      passwordHash: '$2b$10$YourHashedPasswordHere', // placeholder
+      role: AdminRole.moderator,
+    },
+  ];
+
+  for (const user of adminUsers) {
+    await prisma.adminUser.upsert({
+      where: { email: user.email },
+      update: {},
+      create: user,
+    });
+  }
+
+  console.log('✅ Usuarios admin creados:');
+  console.log('   - admin@sn8.com (rol: admin)');
+  console.log('   - moderator@sn8.com (rol: moderator)');
+  console.log('   Nota: Las contraseñas deben configurarse manualmente en la BD');
+  console.log('');
+
   const normalizedPhone = '+573102345678';
   const displayPhone = '+57 310***678';
 

@@ -113,6 +113,12 @@ export class ReportsService {
   }
 
   async checkRateLimits(req: any): Promise<void> {
+    // Skip rate limiting in development
+    const nodeEnv = this.config.get<string>('nodeEnv') ?? 'development';
+    if (nodeEnv === 'development') {
+      return;
+    }
+    
     const ip = getClientIp(req);
     const ipHash = hashIp(ip);
     try {
@@ -135,9 +141,33 @@ export class ReportsService {
     return this.s3.getPresignedUrl(dto.fileName, dto.mimeType, dto.size);
   }
 
+  async uploadFile(file: Express.Multer.File) {
+    const ext = file.originalname.split('.').pop() ?? 'bin';
+    const key = `reports/${randomUUID()}/${Date.now()}.${ext}`;
+    
+    // Calculate checksum
+    const checksum = createHash('sha256').update(file.buffer).digest('hex');
+    
+    // Upload to S3/R2
+    await this.s3.uploadBuffer(key, file.buffer, file.mimetype);
+    
+    const publicUrl = this.s3.getPublicUrl(key);
+    
+    return {
+      publicUrl,
+      key,
+      fileName: file.originalname,
+      mimeType: file.mimetype,
+      size: file.size,
+      checksum,
+    };
+  }
+
   async createReport(dto: CreateReportDto, req: any) {
     await this.checkRateLimits(req);
-    await this.validateCaptcha(dto.captchaToken);
+    if (dto.captchaToken) {
+      await this.validateCaptcha(dto.captchaToken);
+    }
 
     const normalizedPhone = normalizeColombianPhone(dto.phone);
     const amountCents = dto.amount != null ? BigInt(dto.amount * 100) : null;
@@ -199,6 +229,12 @@ export class ReportsService {
         data: {
           targetId: reportTarget.id,
           reporterIpHash,
+          // Datos del reportante
+          reporterBusinessName: dto.reporter.businessName,
+          reporterDocumentId: dto.reporter.documentId,
+          reporterPhone: dto.reporter.phone,
+          reporterEmail: dto.reporter.email ?? null,
+          // Datos del reportado
           reporterName: null,
           reportedName: dto.reportedName ?? null,
           amountCents,
@@ -215,9 +251,9 @@ export class ReportsService {
         await tx.reportEvidence.createMany({
           data: evidenceData.map((e: EvidenceItemDto) => ({
             reportId: report.id,
-            fileUrl: `pending:${randomUUID()}`, // placeholder until actual upload
+            fileUrl: e.fileUrl,
             fileType: e.mimeType,
-            fileSize: 0,
+            fileSize: e.fileSize,
             checksum: e.checksum,
           })),
         });

@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PageLayout } from "@/components/layout";
 
 function ShieldIcon({ className }: { className?: string }) {
   return (
@@ -162,116 +164,92 @@ const stats = [
   { value: "5 seg", label: "Tiempo de consulta", sublabel: "resultados inmediatos" },
 ];
 
+function BrainIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z"
+      />
+    </svg>
+  );
+}
+
 const features = [
   {
     icon: FlagIcon,
     title: "Reportar",
     description:
-      "Registra comprobantes falsos y números sospechosos. Tu reporte ayuda a proteger a miles de comerciantes.",
+      "Registra comprobantes falsos y números sospechosos con cédula del estafador. Tu reporte ayuda a proteger a miles de comerciantes.",
+    href: "/reportar",
+    cta: "Hacer un reporte",
+    highlight: true,
   },
   {
     icon: SearchIcon,
     title: "Consultar",
     description:
       "Verifica cualquier número antes de una transacción. Accede al historial de reportes de la comunidad.",
+    href: "/consultar",
+    cta: "Consultar ahora",
   },
   {
-    icon: UsersIcon,
-    title: "Comunidad",
+    icon: DocumentIcon,
+    title: "Estadísticas",
     description:
-      "Únete a una red de comerciantes protegidos. Juntos creamos un ecosistema más seguro.",
+      "Visualiza datos actualizados sobre fraudes en Colombia. Identifica patrones y mantente informado.",
+    href: "/estadisticas",
+    cta: "Ver estadísticas",
   },
 ];
 
 export default function Home() {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
 
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/consultar?phone=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  };
+
   return (
-    <div className="relative min-h-screen bg-background">
-      {/* Grid pattern background */}
-      <div
-        className="pointer-events-none fixed inset-0 opacity-[0.02]"
-        style={{
-          backgroundImage: `linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)`,
-          backgroundSize: "64px 64px",
-        }}
-      />
-
-      {/* Navbar */}
-      <header className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-foreground">
-              <ShieldIcon className="h-5 w-5 text-background" />
-            </div>
-            <div className="flex flex-col">
-              <span className="font-semibold tracking-tight text-foreground">
-                SN8Labs
-              </span>
-              <span className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-                AntiFraude Colombia
+    <PageLayout>
+      {/* Hero Section */}
+      <section className="relative overflow-hidden">
+        <div className="mx-auto max-w-7xl px-6 pb-20 pt-16 md:pb-32 md:pt-24">
+          <div className="mx-auto max-w-4xl text-center">
+            {/* Badge */}
+            <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2">
+              <span className="flex h-2 w-2 rounded-full bg-accent" />
+              <span className="text-sm text-muted-foreground">
+                Protección comunitaria activa
               </span>
             </div>
-          </div>
 
-          <nav className="hidden items-center gap-8 md:flex">
-            <Link
-              href="/reportar"
-              className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-            >
-              Reportar
-            </Link>
-            <Link
-              href="/consultar"
-              className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-            >
-              Consultar
-            </Link>
-            <Link
-              href="/estadisticas"
-              className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-            >
-              Estadísticas
-            </Link>
-          </nav>
+            {/* Headline */}
+            <h1 className="text-balance text-4xl font-bold tracking-tight text-foreground md:text-6xl lg:text-7xl">
+              Protege tu negocio de{" "}
+              <span className="text-accent">comprobantes falsos</span>
+            </h1>
 
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" className="hidden md:inline-flex">
-              Iniciar sesión
-            </Button>
-            <Button size="sm" className="bg-foreground text-background hover:bg-foreground/90">
-              Comenzar gratis
-            </Button>
-          </div>
-        </div>
-      </header>
+            <p className="mx-auto mt-6 max-w-2xl text-pretty text-lg text-muted-foreground md:text-xl">
+              Consulta números reportados y alerta a la comunidad sobre estafas
+              con comprobantes falsos de Nequi, Bancolombia y más en Colombia.
+            </p>
 
-      <main>
-        {/* Hero Section */}
-        <section className="relative overflow-hidden">
-          <div className="mx-auto max-w-7xl px-6 pb-20 pt-16 md:pb-32 md:pt-24">
-            <div className="mx-auto max-w-4xl text-center">
-              {/* Badge */}
-              <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2">
-                <span className="flex h-2 w-2 rounded-full bg-accent" />
-                <span className="text-sm text-muted-foreground">
-                  Protección comunitaria activa
-                </span>
-              </div>
-
-              {/* Headline */}
-              <h1 className="text-balance text-4xl font-bold tracking-tight text-foreground md:text-6xl lg:text-7xl">
-                Protege tu negocio de{" "}
-                <span className="text-accent">comprobantes falsos</span>
-              </h1>
-
-              <p className="mx-auto mt-6 max-w-2xl text-pretty text-lg text-muted-foreground md:text-xl">
-                Consulta números reportados y alerta a la comunidad sobre estafas
-                con comprobantes falsos de Nequi, Bancolombia y más en Colombia.
-              </p>
-
-              {/* Search Box */}
-              <div className="mx-auto mt-10 max-w-xl">
+            {/* Search Box */}
+            <div className="mx-auto mt-10 max-w-xl">
+              <form onSubmit={handleSearch}>
                 <div className="relative">
                   <div className="absolute inset-0 -z-10 rounded-2xl bg-accent/10 blur-xl" />
                   <div className="relative flex items-center gap-2 rounded-2xl border border-border bg-card p-2">
@@ -286,6 +264,7 @@ export default function Home() {
                       className="h-12 flex-1 border-0 bg-transparent text-base focus-visible:ring-0 focus-visible:ring-offset-0"
                     />
                     <Button
+                      type="submit"
                       size="lg"
                       className="h-12 gap-2 rounded-xl bg-foreground px-6 text-background hover:bg-foreground/90"
                     >
@@ -294,223 +273,181 @@ export default function Home() {
                     </Button>
                   </div>
                 </div>
-                <p className="mt-3 text-center text-xs text-muted-foreground">
-                  Búsquedas ilimitadas. Sin registro requerido.
-                </p>
-              </div>
+              </form>
+              <p className="mt-3 text-center text-xs text-muted-foreground">
+                Búsquedas ilimitadas. Sin registro requerido.
+              </p>
             </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* Stats Section */}
-        <section className="border-y border-border bg-card/50">
-          <div className="mx-auto grid max-w-7xl grid-cols-2 divide-x divide-border md:grid-cols-4">
-            {stats.map((stat) => (
-              <div key={stat.label} className="px-6 py-8 md:px-8 md:py-12">
-                <div className="text-2xl font-bold tracking-tight text-foreground md:text-3xl">
-                  {stat.value}
+      {/* Stats Section */}
+      <section className="border-y border-border bg-card/50">
+        <div className="mx-auto grid max-w-7xl grid-cols-2 divide-x divide-border md:grid-cols-4">
+          {stats.map((stat) => (
+            <div key={stat.label} className="px-6 py-8 md:px-8 md:py-12">
+              <div className="text-2xl font-bold tracking-tight text-foreground md:text-3xl">
+                {stat.value}
+              </div>
+              <div className="mt-1 text-sm font-medium text-foreground">
+                {stat.label}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {stat.sublabel}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Features Grid */}
+      <section className="py-20 md:py-32">
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="mb-16 max-w-2xl">
+            <h2 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">
+              Todo lo que necesitas para proteger tu negocio
+            </h2>
+            <p className="mt-4 text-lg text-muted-foreground">
+              Herramientas diseñadas por y para comerciantes colombianos.
+            </p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            {features.map((feature) => (
+              <div
+                key={feature.title}
+                className={`group relative overflow-hidden rounded-2xl border p-8 transition-all hover:bg-surface-elevated ${
+                  feature.highlight
+                    ? "border-violet-500/40 bg-violet-500/5 hover:border-violet-500/60"
+                    : "border-border bg-card hover:border-accent/40"
+                }`}
+              >
+                {feature.highlight && (
+                  <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-violet-500/20 blur-2xl" />
+                )}
+                <div className={`mb-6 flex h-12 w-12 items-center justify-center rounded-xl transition-colors ${
+                  feature.highlight
+                    ? "bg-violet-500/10 text-violet-400 group-hover:bg-violet-500 group-hover:text-white"
+                    : "bg-secondary text-accent group-hover:bg-accent group-hover:text-background"
+                }`}>
+                  <feature.icon className="h-6 w-6" />
                 </div>
-                <div className="mt-1 text-sm font-medium text-foreground">
-                  {stat.label}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {stat.sublabel}
+                <h3 className="text-xl font-semibold text-foreground">
+                  {feature.title}
+                </h3>
+                <p className="mt-2 text-muted-foreground">
+                  {feature.description}
+                </p>
+                <div className="mt-6">
+                  <Link
+                    href={feature.href}
+                    className={`inline-flex items-center text-sm font-medium transition-colors hover:opacity-80 ${
+                      feature.highlight ? "text-violet-400" : "text-accent"
+                    }`}
+                  >
+                    {feature.cta}
+                    <ArrowRightIcon className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                  </Link>
                 </div>
               </div>
             ))}
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* Features Grid */}
-        <section className="py-20 md:py-32">
-          <div className="mx-auto max-w-7xl px-6">
-            <div className="mb-16 max-w-2xl">
-              <h2 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">
-                Todo lo que necesitas para proteger tu negocio
-              </h2>
-              <p className="mt-4 text-lg text-muted-foreground">
-                Herramientas diseñadas por y para comerciantes colombianos.
-              </p>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-3">
-              {features.map((feature, index) => (
-                <div
-                  key={feature.title}
-                  className="group relative overflow-hidden rounded-2xl border border-border bg-card p-8 transition-all hover:border-accent/40 hover:bg-surface-elevated"
-                >
-                  <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-xl bg-secondary text-accent transition-colors group-hover:bg-accent group-hover:text-background">
-                    <feature.icon className="h-6 w-6" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-foreground">
-                    {feature.title}
-                  </h3>
-                  <p className="mt-2 text-muted-foreground">
-                    {feature.description}
-                  </p>
-                  <div className="mt-6">
-                    <Link
-                      href={
-                        index === 0
-                          ? "/reportar"
-                          : index === 1
-                            ? "/consultar"
-                            : "/comunidad"
-                      }
-                      className="inline-flex items-center text-sm font-medium text-accent transition-colors hover:text-accent/80"
-                    >
-                      {index === 0
-                        ? "Hacer un reporte"
-                        : index === 1
-                          ? "Consultar ahora"
-                          : "Unirse a la comunidad"}
-                      <ArrowRightIcon className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                    </Link>
-                  </div>
+      {/* CTA Cards */}
+      <section className="border-t border-border py-20 md:py-32">
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Report Card */}
+            <Link
+              href="/reportar"
+              className="group relative overflow-hidden rounded-3xl border border-destructive/30 bg-card p-8 transition-all hover:border-destructive/50 md:p-12"
+            >
+              <div className="absolute -right-20 -top-20 h-60 w-60 rounded-full bg-destructive/10 blur-3xl transition-all group-hover:bg-destructive/20" />
+              <div className="relative">
+                <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-destructive/10 text-destructive transition-colors group-hover:bg-destructive group-hover:text-destructive-foreground">
+                  <AlertIcon className="h-8 w-8" />
                 </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* CTA Cards */}
-        <section className="border-t border-border py-20 md:py-32">
-          <div className="mx-auto max-w-7xl px-6">
-            <div className="grid gap-6 md:grid-cols-2">
-              {/* Report Card */}
-              <Link
-                href="/reportar"
-                className="group relative overflow-hidden rounded-3xl border border-border bg-card p-8 transition-all hover:border-destructive/40 md:p-12"
-              >
-                <div className="absolute -right-20 -top-20 h-60 w-60 rounded-full bg-destructive/10 blur-3xl transition-all group-hover:bg-destructive/20" />
-                <div className="relative">
-                  <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-destructive/10 text-destructive transition-colors group-hover:bg-destructive group-hover:text-destructive-foreground">
-                    <AlertIcon className="h-8 w-8" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-foreground md:text-3xl">
-                    Reportar un caso
-                  </h3>
-                  <p className="mt-3 max-w-md text-muted-foreground">
-                    ¿Recibiste un comprobante falso? Regístralo y ayuda a
-                    proteger a otros comerciantes de caer en la misma estafa.
-                  </p>
-                  <div className="mt-8 inline-flex items-center gap-2 text-sm font-medium text-destructive">
-                    Reportar ahora
-                    <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                  </div>
-                </div>
-              </Link>
-
-              {/* Search Card */}
-              <Link
-                href="/consultar"
-                className="group relative overflow-hidden rounded-3xl border border-border bg-card p-8 transition-all hover:border-accent/40 md:p-12"
-              >
-                <div className="absolute -right-20 -top-20 h-60 w-60 rounded-full bg-accent/10 blur-3xl transition-all group-hover:bg-accent/20" />
-                <div className="relative">
-                  <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-accent/10 text-accent transition-colors group-hover:bg-accent group-hover:text-background">
-                    <SearchIcon className="h-8 w-8" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-foreground md:text-3xl">
-                    Consultar número
-                  </h3>
-                  <p className="mt-3 max-w-md text-muted-foreground">
-                    Antes de aceptar un pago, verifica si el número ha sido
-                    reportado previamente por otros miembros de la comunidad.
-                  </p>
-                  <div className="mt-8 inline-flex items-center gap-2 text-sm font-medium text-accent">
-                    Consultar ahora
-                    <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                  </div>
-                </div>
-              </Link>
-            </div>
-          </div>
-        </section>
-
-        {/* Trust Section */}
-        <section className="border-t border-border bg-card/50 py-16">
-          <div className="mx-auto max-w-7xl px-6">
-            <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-6">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <ShieldIcon className="h-5 w-5 text-accent" />
-                <span>Verificación comunitaria</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <DocumentIcon className="h-5 w-5 text-accent" />
-                <span>Datos protegidos</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <UsersIcon className="h-5 w-5 text-accent" />
-                <span>+5,000 comerciantes activos</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-background">
-                  $0
-                </span>
-                <span>100% gratuito</span>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Pro Section */}
-        <section className="border-t border-border py-20 md:py-32">
-          <div className="mx-auto max-w-7xl px-6">
-            <div className="relative overflow-hidden rounded-3xl border border-accent/20 bg-gradient-to-br from-card to-secondary p-8 md:p-16">
-              <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full bg-accent/5 blur-3xl" />
-              <div className="relative mx-auto max-w-2xl text-center">
-                <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-4 py-1.5 text-sm font-medium text-accent">
-                  Próximamente
-                </div>
-                <h2 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">
-                  AntiFraude Pro para negocios
-                </h2>
-                <p className="mt-4 text-lg text-muted-foreground">
-                  API de verificación en tiempo real, alertas automáticas,
-                  integraciones con tu punto de venta y mucho más.
+                <h3 className="text-2xl font-bold text-foreground md:text-3xl">
+                  Reportar un caso
+                </h3>
+                <p className="mt-3 max-w-md text-muted-foreground">
+                  ¿Recibiste un comprobante falso? Regístralo y ayuda a
+                  proteger a otros comerciantes de caer en la misma estafa.
                 </p>
-                <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-                  <Button
-                    size="lg"
-                    className="w-full bg-foreground text-background hover:bg-foreground/90 sm:w-auto"
-                  >
-                    Unirse a la lista de espera
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    className="w-full border-border sm:w-auto"
-                  >
-                    Ver características
-                  </Button>
+                <div className="mt-8 inline-flex items-center gap-2 text-sm font-medium text-destructive">
+                  Reportar ahora
+                  <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </div>
               </div>
-            </div>
-          </div>
-        </section>
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-border bg-card/50">
-        <div className="mx-auto max-w-7xl px-6 py-12">
-          <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
-            <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground">
-                <ShieldIcon className="h-4 w-4 text-background" />
-              </div>
-              <span className="text-sm font-medium text-foreground">
-                SN8Labs — AntiFraude Colombia
-              </span>
-            </div>
-            <p className="max-w-md text-center text-xs text-muted-foreground md:text-right">
-              La información es proporcionada por la comunidad y tiene fines
-              informativos. No nos hacemos responsables por decisiones basadas
-              en estos datos.
-            </p>
+            </Link>
           </div>
         </div>
-      </footer>
-    </div>
+      </section>
+
+      {/* Trust Section */}
+      <section className="border-t border-border bg-card/50 py-16">
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-6">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <ShieldIcon className="h-5 w-5 text-accent" />
+              <span>Verificación comunitaria</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <DocumentIcon className="h-5 w-5 text-accent" />
+              <span>Datos protegidos</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <UsersIcon className="h-5 w-5 text-accent" />
+              <span>+5,000 comerciantes activos</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-background">
+                $0
+              </span>
+              <span>100% gratuito</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Pro Section */}
+      <section className="border-t border-border py-20 md:py-32">
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="relative overflow-hidden rounded-3xl border border-accent/20 bg-gradient-to-br from-card to-secondary p-8 md:p-16">
+            <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full bg-accent/5 blur-3xl" />
+            <div className="relative mx-auto max-w-2xl text-center">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-4 py-1.5 text-sm font-medium text-accent">
+                Próximamente
+              </div>
+              <h2 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">
+                AntiFraude Pro para negocios
+              </h2>
+              <p className="mt-4 text-lg text-muted-foreground">
+                API de verificación en tiempo real, alertas automáticas,
+                integraciones con tu punto de venta y mucho más.
+              </p>
+              <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+                <Button
+                  size="lg"
+                  className="w-full bg-foreground text-background hover:bg-foreground/90 sm:w-auto"
+                >
+                  Unirse a la lista de espera
+                </Button>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="w-full border-border sm:w-auto"
+                >
+                  Ver características
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </PageLayout>
   );
 }

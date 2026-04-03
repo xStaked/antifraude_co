@@ -60,12 +60,18 @@ export class SearchService {
       },
     });
 
+    // Calculate risk level based on actual approved reports count
+    const totalApproved = recentReports.length;
+    const riskLevel = totalApproved === 0 ? 'none' : 
+                      totalApproved <= 2 ? 'low' : 
+                      totalApproved <= 5 ? 'medium' : 'high';
+
     return {
       targetId: target.id,
       displayPhone: target.displayPhoneMasked,
-      riskLevel: target.riskLevelSnapshot,
+      riskLevel,
       riskScore: target.riskScoreSnapshot,
-      totalApprovedReports: target.totalApprovedReports,
+      totalApprovedReports: totalApproved,
       lastReportAt: target.lastReportAt?.toISOString() ?? null,
       recentReports: recentReports.map((r) => ({
         id: r.id,
