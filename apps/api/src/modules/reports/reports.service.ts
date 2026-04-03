@@ -11,6 +11,7 @@ import { CreateReportDto, EvidenceItemDto, PresignedUrlDto } from './reports.dto
 import { createHash, randomUUID } from 'crypto';
 import { TrustScoreService } from '../../shared/security/trust-score.service';
 import { AbuseService } from '../../shared/security/abuse.service';
+import { HttpRequest } from '../../shared/http/http-request';
 
 function computeDedupHash(
   normalizedPhone: string,
@@ -21,7 +22,7 @@ function computeDedupHash(
   return createHash('sha256').update(payload).digest('hex');
 }
 
-function getClientIp(req: any): string {
+function getClientIp(req: HttpRequest): string {
   const forwarded = req.headers?.['x-forwarded-for'];
   if (typeof forwarded === 'string' && forwarded) {
     return forwarded.split(',')[0]!.trim();
@@ -92,7 +93,7 @@ export class ReportsService {
 
   async createReport(
     dto: CreateReportDto,
-    req: any,
+    req: HttpRequest,
     user: { id: string; phone: string; email: string; fullName: string; documentNumber: string; phoneVerified: boolean; trustScore: number },
     userAgent?: string,
   ) {

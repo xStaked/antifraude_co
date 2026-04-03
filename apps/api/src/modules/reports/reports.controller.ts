@@ -1,13 +1,13 @@
 import { Controller, Post, Body, HttpCode, HttpStatus, Req, UseInterceptors, UploadedFile, BadRequestException, UseGuards } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
-import { Request } from 'express';
 import { ReportsService } from './reports.service';
 import { CreateReportDto, PresignedUrlDto } from './reports.dto';
 import { AuditLogService } from '../../shared/audit/audit-log.service';
 import { UserJwtAuthGuard } from '../auth/user-jwt.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { RateLimit, RateLimitGuard } from '../../shared/security/rate-limit.guard';
+import { HttpRequest } from '../../shared/http/http-request';
 
 @Controller('reports')
 export class ReportsController {
@@ -28,17 +28,19 @@ export class ReportsController {
   @HttpCode(HttpStatus.CREATED)
   async create(
     @Body() dto: CreateReportDto,
-    @Req() req: Request,
+    @Req() req: HttpRequest,
     @CurrentUser() user: { id: string; phone: string; email: string; fullName: string; documentNumber: string; phoneVerified: boolean; trustScore: number },
   ) {
-    const userAgent = req.headers['user-agent'] as string | undefined;
+    const rawUserAgent = req.headers['user-agent'];
+    const userAgent = typeof rawUserAgent === 'string' ? rawUserAgent : undefined;
+    const forwardedFor = req.headers['x-forwarded-for'];
     const result = await this.reportsService.createReport(dto, req, user, userAgent);
 
     await this.auditLog.log({
       action: 'create_report',
       method: req.method,
-      path: req.originalUrl,
-      ip: (req.headers['x-forwarded-for'] as string) || req.ip || 'unknown',
+      path: req.originalUrl ?? req.url,
+      ip: (typeof forwardedFor === 'string' ? forwardedFor : undefined) || req.ip || 'unknown',
       userAgent,
       metadata: { reportId: result.reportId, status: result.status, userId: user.id },
     });
