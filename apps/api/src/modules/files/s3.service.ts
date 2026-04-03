@@ -4,9 +4,13 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
 
+type S3UploadClient = S3Client & {
+  send(command: PutObjectCommand): Promise<unknown>;
+};
+
 @Injectable()
 export class S3Service {
-  private readonly client: S3Client;
+  private readonly client: S3UploadClient;
   private readonly bucketName: string;
   private readonly publicUrl: string;
 
@@ -31,7 +35,7 @@ export class S3Service {
         : undefined,
       // R2 uses virtual-hosted style, MinIO uses path-style
       forcePathStyle: !isR2,
-    });
+    }) as S3UploadClient;
   }
 
   async getPresignedUrl(
