@@ -51,7 +51,7 @@ Asegúrate de que PostgreSQL esté corriendo y la base de datos `antifraude` exi
 ```bash
 # Generar cliente Prisma y sincronizar schema
 pnpm db:generate
-pnpm --filter @sn8/database db:push
+pnpm db:push
 ```
 
 ### 4. Seed de prueba (opcional)

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
 
 interface AdminUser {
   email: string;
@@ -133,6 +134,10 @@ const adminNavItems = [
   { href: "/admin/users", label: "Usuarios", icon: UserGroupIcon },
 ];
 
+function deleteCookie(name: string) {
+  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+}
+
 export function AdminSidebar() {
   const pathname = usePathname();
   const router = useRouter();
@@ -140,13 +145,28 @@ export function AdminSidebar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
-    const userData = localStorage.getItem("admin_user");
-    if (userData) {
-      setUser(JSON.parse(userData));
+    const localData = localStorage.getItem("admin_user");
+    if (localData) {
+      try {
+        setUser(JSON.parse(localData));
+        return;
+      } catch {
+        // fallthrough to api
+      }
     }
-  }, []);
+
+    api<{ user: AdminUser }>('/auth/me')
+      .then((data) => {
+        localStorage.setItem('admin_user', JSON.stringify(data.user));
+        setUser(data.user);
+      })
+      .catch(() => {
+        router.push('/admin/login');
+      });
+  }, [router]);
 
   const handleLogout = () => {
+    deleteCookie('admin_token');
     localStorage.removeItem("admin_token");
     localStorage.removeItem("admin_user");
     router.push("/admin/login");
@@ -161,7 +181,6 @@ export function AdminSidebar() {
 
   return (
     <>
-      {/* Mobile menu button */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between border-b border-border bg-card px-4 py-3">
         <Link href="/admin/dashboard" className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent">
@@ -197,13 +216,11 @@ export function AdminSidebar() {
         </button>
       </div>
 
-      {/* Sidebar */}
       <aside
         className={`fixed inset-y-0 left-0 z-40 w-64 transform border-r border-border bg-card transition-transform duration-200 lg:translate-x-0 ${
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        {/* Logo */}
         <div className="flex h-16 items-center gap-2 border-b border-border px-6">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent">
             <ShieldIcon className="h-4 w-4 text-background" />
@@ -211,7 +228,6 @@ export function AdminSidebar() {
           <span className="font-semibold text-foreground">AntiFraude</span>
         </div>
 
-        {/* Navigation */}
         <nav className="flex-1 space-y-1 p-4">
           {navItems.map((item) => (
             <Link
@@ -254,7 +270,6 @@ export function AdminSidebar() {
           )}
         </nav>
 
-        {/* User info & Logout */}
         <div className="border-t border-border p-4">
           <div className="mb-3 flex items-center gap-3 px-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary">
@@ -281,7 +296,6 @@ export function AdminSidebar() {
         </div>
       </aside>
 
-      {/* Overlay for mobile */}
       {isMobileMenuOpen && (
         <div
           className="fixed inset-0 z-30 bg-black/50 lg:hidden"

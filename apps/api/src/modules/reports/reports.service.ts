@@ -2,51 +2,22 @@ import {
   Injectable,
   ConflictException,
   BadRequestException,
-  InternalServerErrorException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { prisma, ReportStatus, Prisma } from '@sn8/database';
+import { prisma, ReportStatus } from '@sn8/database';
 import { normalizeColombianPhone, maskColombianPhone } from '../../shared/utils/phone';
 import { S3Service } from '../files/s3.service';
 import { CreateReportDto, EvidenceItemDto, PresignedUrlDto } from './reports.dto';
 import { createHash, randomUUID } from 'crypto';
-import Redis from 'ioredis';
-import { RateLimiterRedis } from 'rate-limiter-flexible';
-
-function levenshteinDistance(a: string, b: string): number {
-  const matrix: number[][] = Array.from({ length: b.length + 1 }, () => []);
-  for (let i = 0; i <= b.length; i++) matrix[i]![0] = i;
-  for (let j = 0; j <= a.length; j++) matrix[0]![j] = j;
-  for (let i = 1; i <= b.length; i++) {
-    for (let j = 1; j <= a.length; j++) {
-      matrix[i]![j] =
-        b[i - 1] === a[j - 1]
-          ? matrix[i - 1]![j - 1]!
-          : Math.min(
-              matrix[i - 1]![j - 1]! + 1,
-              matrix[i]![j - 1]! + 1,
-              matrix[i - 1]![j]! + 1,
-            );
-    }
-  }
-  return matrix[b.length]![a.length]!;
-}
-
-function similarityPercent(a: string, b: string): number {
-  const maxLen = Math.max(a.length, b.length);
-  if (maxLen === 0) return 100;
-  const dist = levenshteinDistance(a, b);
-  return ((maxLen - dist) / maxLen) * 100;
-}
+import { TrustScoreService } from '../../shared/security/trust-score.service';
+import { AbuseService } from '../../shared/security/abuse.service';
 
 function computeDedupHash(
   normalizedPhone: string,
   amountCents: bigint | null,
   incidentDate: string,
-  fraudType: string,
-  channel: string,
 ): string {
-  const payload = `${normalizedPhone}:${amountCents?.toString() ?? 'NULL'}:${incidentDate}:${fraudType}:${channel}`;
+  const payload = `${normalizedPhone}:${amountCents?.toString() ?? 'NULL'}:${incidentDate}`;
   return createHash('sha256').update(payload).digest('hex');
 }
 
@@ -64,38 +35,19 @@ function hashIp(ip: string): string {
 
 @Injectable()
 export class ReportsService {
-  private readonly redis: Redis;
-  private readonly limiterHour: RateLimiterRedis;
-  private readonly limiterDay: RateLimiterRedis;
   private readonly turnstileSecretKey: string;
 
   constructor(
     private readonly config: ConfigService,
     private readonly s3: S3Service,
+    private readonly trustScore: TrustScoreService,
+    private readonly abuse: AbuseService,
   ) {
-    const redisUrl = this.config.get<string>('redisUrl') ?? 'redis://localhost:6379';
-    this.redis = new Redis(redisUrl);
-
-    this.limiterHour = new RateLimiterRedis({
-      storeClient: this.redis,
-      keyPrefix: 'report_limit_hour',
-      points: 2,
-      duration: 60 * 60, // 1 hour
-    });
-
-    this.limiterDay = new RateLimiterRedis({
-      storeClient: this.redis,
-      keyPrefix: 'report_limit_day',
-      points: 5,
-      duration: 24 * 60 * 60, // 24 hours
-    });
-
     this.turnstileSecretKey = this.config.get<string>('turnstileSecretKey') ?? '';
   }
 
   async validateCaptcha(token: string): Promise<void> {
     if (!this.turnstileSecretKey) {
-      // Skip validation if not configured (local dev)
       return;
     }
     const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
@@ -112,27 +64,6 @@ export class ReportsService {
     }
   }
 
-  async checkRateLimits(req: any): Promise<void> {
-    // Skip rate limiting in development
-    const nodeEnv = this.config.get<string>('nodeEnv') ?? 'development';
-    if (nodeEnv === 'development') {
-      return;
-    }
-    
-    const ip = getClientIp(req);
-    const ipHash = hashIp(ip);
-    try {
-      await this.limiterHour.consume(ipHash);
-    } catch {
-      throw new ConflictException('Demasiados reportes desde esta dirección. Intenta más tarde.');
-    }
-    try {
-      await this.limiterDay.consume(ipHash);
-    } catch {
-      throw new ConflictException('Límite diario de reportes alcanzado.');
-    }
-  }
-
   async getPresignedUrl(dto: PresignedUrlDto) {
     const allowedTypes = ['image/jpeg', 'image/png'];
     if (!allowedTypes.includes(dto.mimeType)) {
@@ -144,15 +75,11 @@ export class ReportsService {
   async uploadFile(file: Express.Multer.File) {
     const ext = file.originalname.split('.').pop() ?? 'bin';
     const key = `reports/${randomUUID()}/${Date.now()}.${ext}`;
-    
-    // Calculate checksum
+
     const checksum = createHash('sha256').update(file.buffer).digest('hex');
-    
-    // Upload to S3/R2
     await this.s3.uploadBuffer(key, file.buffer, file.mimetype);
-    
     const publicUrl = this.s3.getPublicUrl(key);
-    
+
     return {
       publicUrl,
       key,
@@ -163,8 +90,12 @@ export class ReportsService {
     };
   }
 
-  async createReport(dto: CreateReportDto, req: any) {
-    await this.checkRateLimits(req);
+  async createReport(
+    dto: CreateReportDto,
+    req: any,
+    user: { id: string; phone: string; email: string; fullName: string; documentNumber: string; phoneVerified: boolean; trustScore: number },
+    userAgent?: string,
+  ) {
     if (dto.captchaToken) {
       await this.validateCaptcha(dto.captchaToken);
     }
@@ -178,11 +109,9 @@ export class ReportsService {
       normalizedPhone,
       amountCents,
       dto.incidentDate,
-      dto.fraudType,
-      dto.channel,
     );
 
-    // 1. Hard dedup: same hash in last 24h
+    // Hard dedup: same phone + amount + incidentDate in last 24h
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const existingDuplicate = await prisma.report.findFirst({
       where: { dedupHash, createdAt: { gte: since } },
@@ -191,27 +120,6 @@ export class ReportsService {
       throw new ConflictException('Ya existe un reporte similar en las últimas 24 horas.');
     }
 
-    // 2. Soft dedup heuristic
-    let status: ReportStatus = ReportStatus.pending;
-    const target = await prisma.reportTarget.findUnique({
-      where: { normalizedPhone },
-    });
-
-    if (target) {
-      const similarReport = await prisma.report.findFirst({
-        where: {
-          targetId: target.id,
-          createdAt: { gte: since },
-          amountCents,
-          incidentDate,
-        },
-      });
-      if (similarReport && similarityPercent(dto.description, similarReport.description) > 85) {
-        status = ReportStatus.flagged;
-      }
-    }
-
-    // 3. Upsert target and create report in transaction
     const displayPhoneMasked = maskColombianPhone(normalizedPhone);
     const evidenceData = dto.evidence ?? [];
 
@@ -225,17 +133,24 @@ export class ReportsService {
         },
       });
 
+      const { signals: abuseSignals } = await this.abuse.detectAbuseSignals(user.id, reportTarget.id);
+      let reviewPriority = await this.trustScore.recalculateReviewPriority(
+        user.id,
+        evidenceData.length > 0,
+        abuseSignals,
+      );
+
+      let status: ReportStatus = ReportStatus.pending;
+      if (abuseSignals.includes('burst')) {
+        status = ReportStatus.flagged;
+      }
+
       const report = await tx.report.create({
         data: {
           targetId: reportTarget.id,
+          userId: user.id,
           reporterIpHash,
-          // Datos del reportante
-          reporterBusinessName: dto.reporter.businessName,
-          reporterDocumentId: dto.reporter.documentId,
-          reporterPhone: dto.reporter.phone,
-          reporterEmail: dto.reporter.email ?? null,
-          // Datos del reportado
-          reporterName: null,
+          reporterName: user.fullName,
           reportedName: dto.reportedName ?? null,
           amountCents,
           incidentDate,
@@ -243,6 +158,9 @@ export class ReportsService {
           channel: dto.channel,
           description: dto.description,
           status,
+          reviewPriority,
+          reporterUserAgent: userAgent ?? null,
+          abuseFlags: abuseSignals.length > 0 ? (abuseSignals as any) : null,
           dedupHash,
         },
       });
@@ -259,14 +177,21 @@ export class ReportsService {
         });
       }
 
-      return { reportId: report.id, status, duplicateDetected: false };
+      return { reportId: report.id, status, reviewPriority, abuseSignals, targetId: reportTarget.id };
+    });
+
+    // Async jobs after response
+    setImmediate(() => {
+      if (result.abuseSignals.length > 0) {
+        this.trustScore.applyDuplicateAbuse(user.id, result.reportId).catch(() => {});
+      }
     });
 
     return {
       reportId: result.reportId,
       status: result.status,
-      message: status === ReportStatus.flagged
-        ? 'Reporte recibido. Hemos detectado similitudes con otro reporte reciente y será revisado manualmente.'
+      message: result.status === ReportStatus.flagged
+        ? 'Reporte recibido. Hemos detectado actividad inusual y será revisado manualmente.'
         : 'Reporte recibido. Está en revisión.',
       duplicateDetected: false,
     };

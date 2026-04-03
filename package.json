@@ -6,6 +6,7 @@
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "db:generate": "turbo run db:generate",
+    "db:push": "node scripts/run-prisma.js db push --schema packages/database/prisma/schema.prisma",
     "db:migrate": "turbo run db:migrate",
     "db:studio": "turbo run db:studio",
     "postinstall": "node scripts/setup-prisma.js"

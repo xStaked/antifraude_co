@@ -5,12 +5,12 @@ async function main() {
   const adminUsers = [
     {
       email: 'admin@sn8.com',
-      passwordHash: '$2b$10$YourHashedPasswordHere', // placeholder - en producción usar bcrypt
+      passwordHash: '$2b$10$nz7Gn8EPKqprdjXpl8opHeP6DBL4089C94WQostW64H6I83Oyal4e', // admin123
       role: AdminRole.admin,
     },
     {
       email: 'moderator@sn8.com',
-      passwordHash: '$2b$10$YourHashedPasswordHere', // placeholder
+      passwordHash: '$2b$10$1YVjNz3iZ8TB.JTgJZv/Hu6v/yP6Pq1o8l/3.REJbRzDD1TkxKGiO', // mod123
       role: AdminRole.moderator,
     },
   ];
@@ -26,7 +26,7 @@ async function main() {
   console.log('✅ Usuarios admin creados:');
   console.log('   - admin@sn8.com (rol: admin)');
   console.log('   - moderator@sn8.com (rol: moderator)');
-  console.log('   Nota: Las contraseñas deben configurarse manualmente en la BD');
+  console.log('   Contraseñas de prueba: admin@sn8.com / admin123 | moderator@sn8.com / mod123');
   console.log('');
 
   const normalizedPhone = '+573102345678';

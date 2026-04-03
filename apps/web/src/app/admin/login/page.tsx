@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { api } from "@/lib/api";
 
 function ShieldIcon({ className }: { className?: string }) {
   return (
@@ -106,6 +107,11 @@ function EnvelopeIcon({ className }: { className?: string }) {
   );
 }
 
+function setCookie(name: string, value: string, hours: number) {
+  const expires = new Date(Date.now() + hours * 60 * 60 * 1000).toUTCString();
+  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
+}
+
 export default function AdminLoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -120,27 +126,18 @@ export default function AdminLoginPage() {
     setIsLoading(true);
 
     try {
-      // TODO: Implementar llamada real a la API cuando esté lista
-      // const response = await api('/admin/login', {
-      //   method: 'POST',
-      //   body: JSON.stringify({ email, password }),
-      // });
-      
-      // Simulación temporal - remover cuando la API esté lista
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      
-      if (email === "admin@sn8.com" && password === "admin123") {
-        // Guardar token en localStorage (temporal, luego usar cookies httpOnly)
-        localStorage.setItem("admin_token", "fake_token_admin");
-        localStorage.setItem("admin_user", JSON.stringify({ email, role: "admin" }));
-        router.push("/admin/dashboard");
-      } else if (email === "moderator@sn8.com" && password === "mod123") {
-        localStorage.setItem("admin_token", "fake_token_moderator");
-        localStorage.setItem("admin_user", JSON.stringify({ email, role: "moderator" }));
-        router.push("/admin/dashboard");
-      } else {
-        throw new Error("Credenciales inválidas");
-      }
+      const data = await api<{ token: string; user: { id: string; email: string; role: string } }>(
+        '/auth/admin/login',
+        {
+          method: 'POST',
+          body: JSON.stringify({ email, password }),
+        }
+      );
+
+      setCookie('admin_token', data.token, 8);
+      localStorage.setItem('admin_token', data.token);
+      localStorage.setItem('admin_user', JSON.stringify(data.user));
+      router.push("/admin/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al iniciar sesión");
     } finally {
@@ -150,7 +147,6 @@ export default function AdminLoginPage() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-6 py-12">
-      {/* Background pattern */}
       <div
         className="pointer-events-none fixed inset-0 opacity-[0.02]"
         style={{
@@ -160,7 +156,6 @@ export default function AdminLoginPage() {
       />
 
       <div className="relative w-full max-w-md">
-        {/* Logo y titulo */}
         <div className="mb-8 text-center">
           <Link href="/" className="inline-flex items-center gap-2">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent">
@@ -178,10 +173,8 @@ export default function AdminLoginPage() {
           </p>
         </div>
 
-        {/* Login form */}
         <div className="rounded-2xl border border-border bg-card p-8 shadow-sm">
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Email field */}
             <div className="space-y-2">
               <label
                 htmlFor="email"
@@ -206,7 +199,6 @@ export default function AdminLoginPage() {
               </div>
             </div>
 
-            {/* Password field */}
             <div className="space-y-2">
               <label
                 htmlFor="password"
@@ -243,14 +235,12 @@ export default function AdminLoginPage() {
               </div>
             </div>
 
-            {/* Error message */}
             {error && (
               <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                 {error}
               </div>
             )}
 
-            {/* Submit button */}
             <Button
               type="submit"
               className="h-11 w-full"
@@ -284,20 +274,8 @@ export default function AdminLoginPage() {
               )}
             </Button>
           </form>
-
-          {/* Credentials hint (solo para desarrollo) */}
-          <div className="mt-6 rounded-lg border border-border bg-muted/50 p-4">
-            <p className="mb-2 text-xs font-medium text-muted-foreground">
-              Credenciales de prueba:
-            </p>
-            <div className="space-y-1 text-xs text-muted-foreground">
-              <p><strong>Admin:</strong> admin@sn8.com / admin123</p>
-              <p><strong>Moderador:</strong> moderator@sn8.com / mod123</p>
-            </div>
-          </div>
         </div>
 
-        {/* Back link */}
         <div className="mt-6 text-center">
           <Link
             href="/"

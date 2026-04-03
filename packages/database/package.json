@@ -5,10 +5,10 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
-    "db:studio": "prisma studio",
-    "db:push": "prisma db push"
+    "db:generate": "node ../../scripts/run-prisma.js generate --schema packages/database/prisma/schema.prisma",
+    "db:migrate": "node ../../scripts/run-prisma.js migrate dev --schema packages/database/prisma/schema.prisma",
+    "db:studio": "node ../../scripts/run-prisma.js studio --schema packages/database/prisma/schema.prisma",
+    "db:push": "node ../../scripts/run-prisma.js db push --schema packages/database/prisma/schema.prisma"
   },
   "dependencies": {
     "@prisma/client": "^6.5.0"

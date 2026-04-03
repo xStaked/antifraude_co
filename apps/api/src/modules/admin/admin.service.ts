@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { prisma, ReportStatus, ReviewStatus, ActionType } from '@sn8/database';
 import { ModerationActionDto } from './admin.dto';
+import { TrustScoreService } from '../../shared/security/trust-score.service';
 
 export type DashboardStats = {
   pendingReports: number;
@@ -19,6 +20,7 @@ export type PendingReport = {
   date: string;
   status: string;
   description: string;
+  reviewPriority: number;
 };
 
 const fraudTypeLabels: Record<string, string> = {
@@ -34,17 +36,16 @@ const channelLabels: Record<string, string> = {
   other: 'Otro',
 };
 
+function computeRiskLevel(totalApproved: number): string {
+  if (totalApproved === 0) return 'none';
+  if (totalApproved <= 2) return 'low';
+  if (totalApproved <= 5) return 'medium';
+  return 'high';
+}
+
 @Injectable()
 export class AdminService {
-  async getFirstAdmin() {
-    const admin = await prisma.adminUser.findFirst({
-      orderBy: { createdAt: 'asc' },
-    });
-    if (!admin) {
-      throw new Error('No hay usuarios admin en el sistema');
-    }
-    return admin;
-  }
+  constructor(private readonly trustScore: TrustScoreService) {}
 
   async getDashboardStats(): Promise<DashboardStats> {
     const today = new Date();
@@ -56,20 +57,16 @@ export class AdminService {
       totalReports,
       openReviewRequests,
     ] = await Promise.all([
-      // Reportes pendientes
       prisma.report.count({
         where: { status: ReportStatus.pending },
       }),
-      // Aprobados hoy
       prisma.report.count({
         where: {
           status: ReportStatus.approved,
           updatedAt: { gte: today },
         },
       }),
-      // Total de reportes
       prisma.report.count(),
-      // Solicitudes de revisión abiertas
       prisma.reviewRequest.count({
         where: {
           status: { in: [ReviewStatus.open, ReviewStatus.in_review] },
@@ -88,7 +85,7 @@ export class AdminService {
   async getPendingReports(limit: number = 10): Promise<PendingReport[]> {
     const reports = await prisma.report.findMany({
       where: { status: ReportStatus.pending },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ reviewPriority: 'desc' }, { createdAt: 'desc' }],
       take: limit,
       include: {
         target: {
@@ -109,6 +106,7 @@ export class AdminService {
       date: report.createdAt.toISOString(),
       status: report.status,
       description: report.description.slice(0, 100) + (report.description.length > 100 ? '...' : ''),
+      reviewPriority: report.reviewPriority,
     }));
   }
 
@@ -118,6 +116,11 @@ export class AdminService {
       include: {
         target: true,
         evidence: true,
+        user: {
+          include: {
+            trustEvents: true,
+          },
+        },
         actions: {
           include: {
             adminUser: {
@@ -133,6 +136,13 @@ export class AdminService {
       throw new Error('Reporte no encontrado');
     }
 
+    const trustScore = report.user
+      ? report.user.trustEvents.reduce((sum, e) => sum + e.delta, 0)
+      : null;
+    const userReportHistoryCount = report.user
+      ? await prisma.report.count({ where: { userId: report.user.id } })
+      : null;
+
     return {
       id: report.id,
       reportedPhone: report.target.displayPhoneMasked,
@@ -146,6 +156,7 @@ export class AdminService {
       amountCents: report.amountCents ? Number(report.amountCents) : null,
       incidentDate: report.incidentDate.toISOString(),
       status: report.status,
+      reviewPriority: report.reviewPriority,
       createdAt: report.createdAt.toISOString(),
       updatedAt: report.updatedAt.toISOString(),
       target: {
@@ -154,6 +165,25 @@ export class AdminService {
         riskLevel: report.target.riskLevelSnapshot,
         totalApprovedReports: report.target.totalApprovedReports,
       },
+      reporter: report.user
+        ? {
+            userId: report.user.id,
+            phoneVerified: report.user.phoneVerified,
+            trustScore,
+            totalReports: userReportHistoryCount,
+            ipHash: report.reporterIpHash,
+            userAgent: report.reporterUserAgent,
+            flags: report.abuseFlags,
+          }
+        : {
+            userId: null,
+            phoneVerified: null,
+            trustScore: null,
+            totalReports: null,
+            ipHash: report.reporterIpHash,
+            userAgent: report.reporterUserAgent,
+            flags: report.abuseFlags,
+          },
       evidence: report.evidence.map((e) => ({
         id: e.id,
         fileUrl: e.fileUrl,
@@ -175,22 +205,19 @@ export class AdminService {
     adminUserId: string,
     dto: ModerationActionDto,
   ) {
-    // Verificar que el reporte existe
     const report = await prisma.report.findUnique({
       where: { id: reportId },
-      include: { target: true },
+      include: { target: true, user: true },
     });
 
     if (!report) {
       throw new NotFoundException('Reporte no encontrado');
     }
 
-    // Verificar que no está ya aprobado/rechazado
     if (report.status !== ReportStatus.pending && report.status !== ReportStatus.flagged) {
       throw new BadRequestException('Este reporte ya fue moderado');
     }
 
-    // Determinar el nuevo status basado en la acción
     let newStatus: ReportStatus;
     switch (dto.actionType) {
       case ActionType.approve:
@@ -209,9 +236,7 @@ export class AdminService {
         throw new BadRequestException('Tipo de acción no válido');
     }
 
-    // Ejecutar en transacción
     const result = await prisma.$transaction(async (tx) => {
-      // Crear la acción de moderación
       const action = await tx.moderationAction.create({
         data: {
           reportId,
@@ -221,25 +246,38 @@ export class AdminService {
         },
       });
 
-      // Actualizar el status del reporte
       const updatedReport = await tx.report.update({
         where: { id: reportId },
         data: { status: newStatus },
       });
 
-      // Si se aprueba, actualizar conteos del target
       if (dto.actionType === ActionType.approve) {
+        const newTotal = report.target.totalApprovedReports + 1;
         await tx.reportTarget.update({
           where: { id: report.targetId },
           data: {
-            totalApprovedReports: { increment: 1 },
+            totalApprovedReports: newTotal,
             lastReportAt: new Date(),
+            riskScoreSnapshot: newTotal,
+            riskLevelSnapshot: computeRiskLevel(newTotal) as any,
           },
         });
       }
 
       return { action, report: updatedReport };
     });
+
+    // Async trust score updates
+    if (dto.actionType === ActionType.approve && report.user) {
+      setImmediate(() => {
+        this.trustScore.applyApprovedReport(report.user!.id, reportId).catch(() => {});
+      });
+    }
+    if (dto.actionType === ActionType.reject && report.user) {
+      setImmediate(() => {
+        this.trustScore.applyFalseReportPenalty(report.user!.id, reportId).catch(() => {});
+      });
+    }
 
     return {
       success: true,

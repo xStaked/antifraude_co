@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
+import { api } from "@/lib/api";
 
 export default function DashboardLayout({
   children,
@@ -14,14 +15,27 @@ export default function DashboardLayout({
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    // Verificar si el usuario está autenticado
-    const token = localStorage.getItem("admin_token");
-    if (!token) {
-      router.push("/admin/login");
-    } else {
-      setIsAuthenticated(true);
-    }
-    setIsLoading(false);
+    let cancelled = false;
+
+    api<{ user: { id: string; email: string; role: string } }>('/auth/me')
+      .then((data) => {
+        if (!cancelled) {
+          localStorage.setItem('admin_user', JSON.stringify(data.user));
+          setIsAuthenticated(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          router.push("/admin/login");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   if (isLoading) {
@@ -61,9 +75,7 @@ export default function DashboardLayout({
     <div className="min-h-screen bg-background">
       <AdminSidebar />
       
-      {/* Main content */}
       <div className="lg:ml-64">
-        {/* Spacer for mobile header */}
         <div className="h-14 lg:hidden" />
         
         <main className="p-4 sm:p-6 lg:p-8">

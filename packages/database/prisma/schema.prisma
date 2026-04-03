@@ -30,12 +30,8 @@ model ReportTarget {
 model Report {
   id                  String     @id @default(uuid()) @db.Uuid
   targetId            String     @db.Uuid
+  userId              String     @db.Uuid
   reporterIpHash      String     @db.VarChar(64)
-  // Datos del reportante (para verificación de identidad)
-  reporterBusinessName String?   @db.VarChar(100)
-  reporterDocumentId   String?   @db.VarChar(20)
-  reporterPhone        String?   @db.VarChar(20)
-  reporterEmail        String?   @db.VarChar(100)
   // Datos del reportado
   reporterName        String?    @db.VarChar(100)
   reportedName        String?    @db.VarChar(100)
@@ -45,17 +41,24 @@ model Report {
   channel             Channel
   description         String     @db.Text
   status              ReportStatus @default(pending)
+  reviewPriority      Int        @default(0)
+  reporterUserAgent   String?    @db.VarChar(500)
+  abuseFlags          Json?
   dedupHash           String     @db.VarChar(64)
-  createdAt           DateTime   @default(now()) @db.Timestamptz(6)
-  updatedAt           DateTime   @updatedAt @db.Timestamptz(6)
+  createdAt           DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt           DateTime @updatedAt @db.Timestamptz(6)
 
   target     ReportTarget        @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  user       User                @relation(fields: [userId], references: [id], onDelete: Restrict)
   evidence   ReportEvidence[]
   actions    ModerationAction[]
+  trustEvents TrustEvent[]
 
   @@index([targetId, status])
   @@index([dedupHash])
   @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([status, reviewPriority, createdAt])
   @@map("reports")
 }
 
@@ -92,7 +95,8 @@ model ModerationAction {
 
 model ReviewRequest {
   id               String            @id @default(uuid()) @db.Uuid
-  targetId         String            @db.Uuid
+  targetId         String?           @db.Uuid
+  normalizedPhone  String            @db.VarChar(15)
   applicantName    String            @db.VarChar(100)
   contactEmail     String            @db.VarChar(255)
   reason           String            @db.Text
@@ -101,10 +105,11 @@ model ReviewRequest {
   createdAt        DateTime          @default(now()) @db.Timestamptz(6)
   updatedAt        DateTime          @updatedAt @db.Timestamptz(6)
 
-  target ReportTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  target ReportTarget? @relation(fields: [targetId], references: [id], onDelete: Cascade)
 
   @@index([targetId])
   @@index([status])
+  @@index([normalizedPhone])
   @@map("review_requests")
 }
 
@@ -119,6 +124,74 @@ model AdminUser {
   actions ModerationAction[]
 
   @@map("admin_users")
+}
+
+model User {
+  id             String   @id @default(uuid()) @db.Uuid
+  fullName       String   @db.VarChar(120)
+  documentNumber String   @unique @db.VarChar(30)
+  phone          String   @unique @db.VarChar(20)
+  phoneVerified  Boolean  @default(false)
+  email          String   @unique @db.VarChar(255)
+  passwordHash   String   @db.VarChar(255)
+  trustScore     Int      @default(0)
+  status         UserStatus @default(active)
+  createdAt      DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(6)
+
+  reports        Report[]
+  otpChallenges  OtpChallenge[]
+  trustEvents    TrustEvent[]
+
+  @@index([phoneVerified, trustScore])
+  @@map("users")
+}
+
+model OtpChallenge {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  phone       String   @db.VarChar(20)
+  codeHash    String   @db.VarChar(255)
+  attempts    Int      @default(0)
+  expiresAt   DateTime @db.Timestamptz(6)
+  verifiedAt  DateTime? @db.Timestamptz(6)
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+
+  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("otp_challenges")
+}
+
+model TrustEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @db.Uuid
+  reportId   String?  @db.Uuid
+  reason     TrustEventReason
+  delta      Int
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+
+  user       User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  report     Report? @relation(fields: [reportId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@map("trust_events")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  action      String   @db.VarChar(50)
+  method      String   @db.VarChar(10)
+  path        String   @db.Text
+  ipHash      String   @db.VarChar(64)
+  userAgent   String?  @db.Text
+  adminUserId String?  @db.Uuid
+  metadata    String?  @db.Text
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([createdAt])
+  @@index([action])
+  @@map("audit_logs")
 }
 
 enum RiskLevel {
@@ -166,4 +239,17 @@ enum ReviewStatus {
 enum AdminRole {
   moderator
   admin
+}
+
+enum UserStatus {
+  active
+  suspended
+  banned
+}
+
+enum TrustEventReason {
+  phone_verified
+  report_approved
+  report_rejected_false
+  duplicate_abuse
 }

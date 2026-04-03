@@ -40,35 +40,7 @@ export class EvidenceItemDto {
   fileSize!: number;
 }
 
-class ReporterDto {
-  @IsString()
-  @MinLength(2)
-  @MaxLength(100)
-  businessName!: string;
-
-  @IsString()
-  @MinLength(6)
-  @MaxLength(20)
-  documentId!: string;
-
-  @IsString()
-  @MinLength(10)
-  @MaxLength(20)
-  phone!: string;
-
-  @IsString()
-  @IsOptional()
-  @MaxLength(100)
-  email?: string;
-}
-
 export class CreateReportDto {
-  // Datos del reportante
-  @ValidateNested()
-  @Type(() => ReporterDto)
-  reporter!: ReporterDto;
-
-  // Datos del caso
   @IsString()
   @MinLength(10)
   @MaxLength(20)
